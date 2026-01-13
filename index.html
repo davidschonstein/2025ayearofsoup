@@ -37,6 +37,11 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.1.0/leaflet.markercluster.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.1.0/MarkerCluster.css"/>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.1.0/MarkerCluster.Default.css"/>
+<style>
+  #filtersDetails > summary::-webkit-details-marker { display:none; }
+  #filtersDetails > summary:hover { box-shadow: 0 1px 6px rgba(0,0,0,0.12); }
+  #filtersDetails[open] > summary { background: rgba(255,255,255,0.98); }
+</style>
 </head>
 <body>
     
@@ -74,8 +79,21 @@
 
   <div style="height:10px;"></div>
 
-  <div style="font-weight:800; font-size:12px; margin-bottom:6px;">Filters</div>
-
+  <details id="filtersDetails" style="margin-top:6px;">
+  <summary style="
+    list-style: none;
+    cursor: pointer;
+    user-select: none;
+    padding: 7px 10px;
+    border-radius: 12px;
+    border: 1px solid rgba(0,0,0,0.16);
+    background: rgba(255,255,255,0.95);
+    font-weight: 900;
+    font-size: 12px;
+  ">
+    Filters <span style="font-weight:700; color: rgba(0,0,0,0.6);">tap to expand</span>
+  </summary>
+  <div style="height:8px;"></div>
   <div style="display:grid; grid-template-columns: 1fr; gap:8px;">
     <div>
       <div style="font-size:11px; font-weight:700; margin-bottom:4px;">Reviewer</div>
@@ -91,12 +109,15 @@
     </div>
   </div>
 
+  
   <div style="display:flex; gap:8px; margin-top:10px;">
     <button id="applyFilters" style="flex:1; padding:7px 10px; border-radius:10px; border:0; background:#111; color:white; font-weight:800; cursor:pointer;">Apply</button>
     <button id="clearFilters" style="flex:1; padding:7px 10px; border-radius:10px; border:1px solid rgba(0,0,0,0.16); background:white; font-weight:800; cursor:pointer;">Clear</button>
   </div>
+  
   <div id="filterStatus" style="margin-top:8px; font-size:11px; color: rgba(0,0,0,0.65);"></div>
-</div>
+
+</details></div>
 `;
       L.DomEvent.disableClickPropagation(div);
       L.DomEvent.disableScrollPropagation(div);
