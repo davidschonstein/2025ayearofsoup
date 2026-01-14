@@ -46,6 +46,7 @@
 
     // --- Color ramp (0..10) using the same 3-stop palette as before
     function ratingColor(r) {
+      if (!isFinite(r)) return "rgb(180,180,180)";
       const t = Math.max(0, Math.min(10, r)) / 10;
       const stops = [
         { t: 0.0, c: [0xd7, 0x30, 0x27] }, // red
@@ -125,7 +126,7 @@
 
     function markerHTML(rating, soupName) {
       const color = ratingColor(rating);
-      const rtxt = (Math.round(rating*10)/10).toString().replace(/\.0$/, "");
+      const rtxt = isFinite(rating) ? (Math.round(rating*10)/10).toString().replace(/\.0$/, "") : "—";
       const emj = emojiForSoupName(soupName);
       return `
         <div style="position: relative; width: 44px; height: 44px;">
@@ -145,11 +146,12 @@
 
     function popupHTML(row, hasGPS) {
       const parts = [];
-      if (row["Date"]) parts.push(`<b>Date:</b> ${escapeHTML(row["Date"])}`);
+      const dateVal = row["Date"] || row["Review Date"] || row["Review date"] || row["review date"] || "";
+      if (dateVal) parts.push(`<b>Date:</b> ${escapeHTML(dateVal)}`);
       if (row["Reviewer"]) parts.push(`<b>Reviewer:</b> ${escapeHTML(row["Reviewer"])}`);
       if (row["Soup"]) parts.push(`<b>Soup:</b> ${escapeHTML(row["Soup"])}`);
       if (row["Made By"]) parts.push(`<b>Made By:</b> ${escapeHTML(row["Made By"])}`);
-      parts.push(`<b>Rating:</b> ${escapeHTML(row["Rating"])}`);
+      parts.push(`<b>Rating:</b> ${isFinite(parseFloat(row["Rating"])) ? escapeHTML(row["Rating"]) : "—"}`);
 
       const locBits = [];
       if (row["City"]) locBits.push(row["City"]);
@@ -344,7 +346,7 @@
 
       for (const row of rows) {
         const rating = parseFloat(row["Rating"]);
-        if (!isFinite(rating)) continue;
+        const hasRating = isFinite(rating);
 
         let lat = parseFloat(row["Latitude"]);
         let lon = parseFloat(row["Longitude"]);
@@ -371,14 +373,14 @@
 
         cluster.addLayer(marker);
 
-        const month = parseMonth(row["Date"]);
-        const ratingInt = Math.max(0, Math.min(10, Math.round(rating)));
+        const month = parseMonth(row["Date"] || row["Review Date"] || row["Review date"] || row["review date"]);
+        const ratingKey = hasRating ? String(Math.max(0, Math.min(10, Math.round(rating)))) : "Unrated";
 
         records.push({
           marker,
           reviewer: (row["Reviewer"] || "Unknown").trim(),
           month,
-          rating: ratingInt
+          rating: ratingKey
         });
 
         bounds.push([lat, lon]);
@@ -389,7 +391,7 @@
       // Prepare filter options
       const reviewers = uniqSorted(records.map(r => r.reviewer));
       const months = uniqSorted(records.map(r => r.month));
-      const ratings = Array.from({length: 11}, (_, i) => String(i));
+      const ratings = ["Unrated", ...Array.from({length: 11}, (_, i) => String(i))];
 
       // Wait until control DOM exists, then wire it up
       function wire() {
