@@ -21,15 +21,30 @@
     /* Control panel sizing/position */
     #soup-controls { width: 270px; transform: translate(-60px, -60px); }
     @media (max-width: 520px) {
-      #soup-controls { width: 220px; transform: translate(0px, -60px); }
+      #soup-controls { width: 220px; transform: translate(0px, 0px); }
       #soup-controls summary { padding: 6px 8px; }
       #soup-controls select { font-size: 12px; }
     }
 
   
-    /* Popup: make taps reliable on mobile */
-    .leaflet-popup-content-wrapper { -webkit-tap-highlight-color: transparent; }
-    .leaflet-popup-content { margin: 10px 12px; }
+    /* Popup wrapper + close button (mobile-friendly) */
+    .popup-wrap { position: relative; padding-right: 34px; }
+    .popup-close-btn {
+      position: absolute;
+      top: 0px;
+      right: 0px;
+      width: 32px;
+      height: 32px;
+      border-radius: 999px;
+      border: 1px solid rgba(0,0,0,0.15);
+      background: rgba(255,255,255,0.95);
+      font-size: 20px;
+      font-weight: 900;
+      line-height: 28px;
+      cursor: pointer;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
 
   </style>
 </head>
@@ -208,12 +223,6 @@
 
     function popupHTML(row, hasGPS, lat, lon) {
       const parts = [];
-      const closeBtn = `<div style="display:flex; justify-content:flex-end; margin:-2px -2px 6px 0;">` +
-        `<button type="button" onclick="event.preventDefault(); event.stopPropagation(); window._soupMap && window._soupMap.closePopup();"` +
-        ` style="width:32px; height:32px; border-radius:999px; border:1px solid rgba(0,0,0,0.15); background:rgba(255,255,255,0.95);` +
-        ` font-size:18px; font-weight:900; line-height:28px; cursor:pointer; touch-action:manipulation;` +
-        ` -webkit-tap-highlight-color: transparent;">×</button></div>`;
-      parts.push(closeBtn);
       const dateVal = getField(row, ["Date","Review Date","review date","Review date"]);
       const reviewer = getField(row, ["Reviewer","reviewer"]);
       const soup = getField(row, ["Soup","soup"]);
@@ -248,7 +257,16 @@
         parts.push(`<b>Photo:</b> None`);
       }
 
-      return parts.join("<br>");
+      const content = parts.join("<br>");
+
+      return `<div class="popup-wrap">`
+
+        + `<button type="button" class="popup-close-btn" onclick="event.preventDefault(); event.stopPropagation(); window._soupMap && window._soupMap.closePopup();" aria-label="Close popup">×</button>`
+
+        + content
+
+        + `</div>`;
+
     }
 
     function addLegendAndFiltersControl(map) {
@@ -398,8 +416,9 @@
 
     async function main() {
       const map = L.map("map", { preferCanvas: true }).setView([20, 0], 2);
-      window._soupMap = map;
-      L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
+      
+    window._soupMap = map;
+L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
         attribution: '&copy; OpenStreetMap contributors &copy; CartoDB'
       }).addTo(map);
 
