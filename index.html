@@ -138,7 +138,18 @@
       return { lat: NaN, lon: NaN, hasGPS: false };
     }
 
-    function parseMonth(dateStr) {
+        function parseISODate(dateStr) {
+      // Expecting YYYY-MM-DD (or YYYY/MM/DD). Returns Date at local midnight.
+      if (!dateStr) return null;
+      const s = String(dateStr).trim();
+      const m = s.match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})/);
+      if (!m) return null;
+      const y = Number(m[1]), mo = Number(m[2]) - 1, d = Number(m[3]);
+      const dt = new Date(y, mo, d);
+      return Number.isNaN(dt.getTime()) ? null : dt;
+    }
+
+function parseMonth(dateStr) {
       if (!dateStr) return "Unknown";
       const d = new Date(String(dateStr).replace(/\//g,"-") + "T00:00:00");
       if (isNaN(d.getTime())) return "Unknown";
@@ -355,6 +366,22 @@
                 <button id="clearFilters" style="flex:1; padding:7px 10px; border-radius:10px; border:1px solid rgba(0,0,0,0.16); background:white; font-weight:800; cursor:pointer;">Clear</button>
               </div>
               <div id="filterStatus" style="margin-top:8px; font-size:11px; color: rgba(0,0,0,0.65);"></div>
+<div style="border-top:1px solid rgba(0,0,0,0.10); margin:12px 0 8px;"></div>
+<div id="timelineControls" style="margin-top:4px;">
+  <div style="display:flex; justify-content:space-between; align-items:center;">
+    <div style="font-size:11px; font-weight:800;">Timeline</div>
+    <div id="timelineLabel" style="font-size:11px; color: rgba(0,0,0,0.65);"></div>
+  </div>
+  <input id="timelineSlider" type="range" min="0" max="0" value="0" step="1" style="width:100%; margin-top:6px;">
+  <div style="display:flex; gap:8px; margin-top:8px; align-items:center;">
+    <button id="timelinePlay" type="button" style="flex:0 0 auto; padding:8px 10px; border-radius:10px; border:1px solid rgba(0,0,0,0.15); background:#fff; font-weight:700; cursor:pointer;">Play</button>
+    <select id="timelineSpeed" style="flex:1; padding:8px 10px; border-radius:10px; border:1px solid rgba(0,0,0,0.15); background:#fff;">
+      <option value="day">1 day / sec</option>
+      <option value="week">1 week / sec</option>
+      <option value="month">1 month / sec</option>
+    </select>
+  </div>
+</div>
             </details>
           </div>
         `;
@@ -495,10 +522,11 @@ L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
 
         const reviewer = getField(row, ["Reviewer","reviewer"]) || "Unknown";
         const dateVal = getField(row, ["Date","Review Date","review date","Review date"]);
-        const month = parseMonth(dateVal);
+        
+    const dateObj = parseISODate(dateVal);const month = parseMonth(dateVal);
         const ratingKey = hasRating ? String(Math.max(0, Math.min(10, Math.round(rating)))) : "Unrated";
 
-        records.push({ marker, reviewer: String(reviewer).trim(), month, rating: ratingKey });
+        records.push({ marker, reviewer: String(reviewer).trim(), month, rating: ratingKey, dateStr: dateVal, dateObj });
         bounds.push([plotLat, plotLon]);
       }
 
@@ -561,22 +589,119 @@ function wire() {
         fillSelect("filterReviewer", reviewerOptions);
         fillSelect("filterMonth", monthOptions);
         fillSelect("filterRating", ratingOptions);
+
+
+        // ---- Timeline (scrub + play) ----
+        const timelineControls = document.getElementById("timelineControls");
+        const timelineSlider = document.getElementById("timelineSlider");
+        const timelineLabel = document.getElementById("timelineLabel");
+        const timelinePlay = document.getElementById("timelinePlay");
+        const timelineSpeed = document.getElementById("timelineSpeed");
+
+        const MS_DAY = 24 * 60 * 60 * 1000;
+        function addDays(d, n) { const nd = new Date(d); nd.setDate(nd.getDate() + n); return nd; }
+        function addMonths(d, n) { const nd = new Date(d); nd.setMonth(nd.getMonth() + n); return nd; }
+        function fmtISO(d) {
+          const y = d.getFullYear();
+          const m = String(d.getMonth() + 1).padStart(2, "0");
+          const da = String(d.getDate()).padStart(2, "0");
+          return `${y}-${m}-${da}`;
+        }
+
+        const dated = records.map(r => r.dateObj).filter(Boolean).sort((a,b) => a - b);
+        let timelineMinDate = null;
+        let timelineAbsMaxDate = null;
+        let timelineMaxDate = null; // current threshold (<=)
+        let playTimer = null;
+
+        function stopPlay() {
+          if (playTimer) { clearInterval(playTimer); playTimer = null; }
+          if (timelinePlay) timelinePlay.textContent = "Play";
+        }
+
+        function setTimelineToDate(d) {
+          if (!timelineMinDate || !timelineAbsMaxDate) return;
+          let cd = new Date(d);
+          if (cd < timelineMinDate) cd = new Date(timelineMinDate);
+          if (cd > timelineAbsMaxDate) cd = new Date(timelineAbsMaxDate);
+          timelineMaxDate = cd;
+
+          const off = Math.round((cd - timelineMinDate) / MS_DAY);
+          if (timelineSlider) timelineSlider.value = String(off);
+          if (timelineLabel) timelineLabel.textContent = `≤ ${fmtISO(cd)}`;
+        }
+
+        if (dated.length) {
+          timelineMinDate = dated[0];
+          timelineAbsMaxDate = dated[dated.length - 1];
+          const diffDays = Math.max(0, Math.round((timelineAbsMaxDate - timelineMinDate) / MS_DAY));
+
+          if (timelineSlider) {
+            timelineSlider.min = "0";
+            timelineSlider.max = String(diffDays);
+            timelineSlider.step = "1";
+          }
+
+          // Default to last review date so all soups show.
+          setTimelineToDate(timelineAbsMaxDate);
+
+          if (timelineSlider) {
+            timelineSlider.addEventListener("input", () => {
+              stopPlay();
+              const off = Number(timelineSlider.value || 0);
+              const d = addDays(timelineMinDate, off);
+              setTimelineToDate(d);
+              applyFilters();
+            });
+          }
+
+          if (timelinePlay) {
+            timelinePlay.addEventListener("click", () => {
+              if (playTimer) { stopPlay(); return; }
+              timelinePlay.textContent = "Pause";
+
+              playTimer = setInterval(() => {
+                if (!timelineMaxDate) timelineMaxDate = new Date(timelineMinDate);
+
+                const mode = (timelineSpeed && timelineSpeed.value) ? timelineSpeed.value : "day";
+                let next = new Date(timelineMaxDate);
+
+                if (mode === "week") next = addDays(next, 7);
+                else if (mode === "month") next = addMonths(next, 1);
+                else next = addDays(next, 1);
+
+                if (next >= timelineAbsMaxDate) next = new Date(timelineAbsMaxDate);
+
+                setTimelineToDate(next);
+                applyFilters();
+
+                if (next.getTime() === timelineAbsMaxDate.getTime()) stopPlay();
+              }, 1000);
+            });
+          }
+        } else {
+          if (timelineControls) timelineControls.style.display = "none";
+        }
+
 const status = document.getElementById("filterStatus");
         if (status) status.textContent = "Showing " + records.length + " soups";
 
         function applyFilters() {
-          const r = document.getElementById("filterReviewer")?.value || "All";
-          const mth = document.getElementById("filterMonth")?.value || "All";
-          const rat = document.getElementById("filterRating")?.value || "All";
+          const reviewerVal = document.getElementById("filterReviewer").value;
+          const monthVal = document.getElementById("filterMonth").value;
+          const ratingVal = document.getElementById("filterRating").value;
 
           cluster.clearLayers();
           let shown = 0;
 
           records.forEach(rec => {
             let ok = true;
-            if (r !== "All") ok = ok && (rec.reviewer === r);
-            if (mth !== "All") ok = ok && (rec.month === mth);
-            if (rat !== "All") ok = ok && (String(rec.rating) === rat);
+            if (reviewerVal !== "All") ok = ok && (rec.reviewer === reviewerVal);
+            if (monthVal !== "All") ok = ok && (rec.month === monthVal);
+            if (ratingVal !== "All") ok = ok && (String(rec.rating) === String(ratingVal));
+
+            if (timelineMaxDate && rec.dateObj) ok = ok && (rec.dateObj <= timelineMaxDate);
+
             if (ok) { cluster.addLayer(rec.marker); shown++; }
           });
 
@@ -584,6 +709,9 @@ const status = document.getElementById("filterStatus");
         }
 
         function clearFilters() {
+          stopPlay();
+          if (timelineAbsMaxDate) setTimelineToDate(timelineAbsMaxDate);
+
           cluster.clearLayers();
           records.forEach(rec => cluster.addLayer(rec.marker));
           document.getElementById("filterReviewer").value = "All";
@@ -591,9 +719,9 @@ const status = document.getElementById("filterStatus");
           document.getElementById("filterRating").value = "All";
           if (status) status.textContent = "Showing " + records.length + " soups";
         }
-
         document.getElementById("applyFilters").addEventListener("click", applyFilters);
         document.getElementById("clearFilters").addEventListener("click", clearFilters);
+        applyFilters();
       }
 
       wire();
