@@ -20,21 +20,7 @@
 
     /* Control panel sizing/position */
     #soup-controls { width: 270px; transform: translate(-60px, -60px); }
-    @media (max-width: 520px) {
-      /* Center the panel between zoom (left) and layers (right) controls */
-      #soup-controls {
-        position: absolute !important;
-        top: 10px !important;
-        left: 50% !important;
-        right: auto !important;
-        margin: 0 !important;
-        width: calc(100vw - 120px) !important; /* leaves room for Leaflet buttons */
-        max-width: 360px;
-        min-width: 220px;
-        transform: translateX(-50%) !important;
-        z-index: 1001;
-      }
-      #soup-controls summary { padding: 6px 8px; }
+    #soup-controls summary { padding: 6px 8px; }
       #soup-controls select { font-size: 12px; }
     }
       #soup-controls summary { padding: 6px 8px; }
@@ -59,6 +45,27 @@
       cursor: pointer;
       touch-action: manipulation;
       -webkit-tap-highlight-color: transparent;
+    }
+
+  
+    @media (max-width: 520px) {
+      /* Force the panel to be centered between zoom (left) and layers (right) */
+      #soup-controls {
+        position: fixed !important;
+        top: 12px !important;
+        left: 50% !important;
+        right: auto !important;
+        margin: 0 !important;
+        width: calc(100vw - 140px) !important; /* room for Leaflet buttons */
+        max-width: 360px !important;
+        min-width: 220px !important;
+        transform: translateX(-50%) !important;
+        z-index: 2000 !important;
+      }
+      /* Compact internals */
+      #soup-controls summary { padding: 6px 8px; }
+      #soup-controls select { font-size: 12px; }
+      #soup-controls a { font-size: 14px; }
     }
 
   </style>
