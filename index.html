@@ -391,11 +391,18 @@
       el.innerHTML = "";
       options.forEach(o => {
         const opt = document.createElement("option");
-        opt.value = o;
-        opt.textContent = o;
+        if (o && typeof o === "object") {
+          opt.value = o.value;
+          opt.textContent = o.label;
+        } else {
+          opt.value = o;
+          opt.textContent = o;
+        }
         el.appendChild(opt);
       });
-      el.value = "All";
+    }
+
+el.value = "All";
     }
 
     function gvizUrl() {
@@ -504,17 +511,56 @@ L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
       const months = uniqSorted(records.map(r => r.month));
       const ratings = ["Unrated", ...Array.from({length: 11}, (_, i) => String(i))];
 
-      function wire() {
+      
+
+      const ratingLabels = {
+        0: "Bowl of diarrhea",
+        1: "Inedible",
+        2: "Disgusting but edible",
+        3: "Not at all enjoyable",
+        4: "Not quite right",
+        5: "Ok, unremarkable",
+        6: "Pleasant",
+        7: "Tasty",
+        8: "Delicious",
+        9: "Extraordinary",
+        10: "Godbowl"
+      };
+
+function wire() {
         if (!document.getElementById("filterReviewer") || !document.getElementById("applyFilters")) {
           setTimeout(wire, 50);
           return;
         }
 
-        fillSelect("filterReviewer", ["All", ...reviewers]);
-        fillSelect("filterMonth", ["All", ...months]);
-        fillSelect("filterRating", ["All", ...ratings]);
+        
+        // Build counts for dropdown labels (based on all records)
+        const reviewerCounts = {};
+        const ratingCounts = {};
+        records.forEach(rec => {
+          reviewerCounts[rec.reviewer] = (reviewerCounts[rec.reviewer] || 0) + 1;
+          ratingCounts[rec.rating] = (ratingCounts[rec.rating] || 0) + 1;
+        });
 
-        const status = document.getElementById("filterStatus");
+        const reviewerOptions = [{ value: "All", label: "All" }].concat(
+          reviewers.map(name => ({ value: name, label: `${name} (${reviewerCounts[name] || 0})` }))
+        );
+
+        const monthOptions = ["All", ...months];
+
+        const ratingOptions = [{ value: "All", label: "All" }].concat(
+          ratings.map(r => {
+            if (r === "Unrated") return { value: r, label: `Unrated (${ratingCounts[r] || 0})` };
+            const n = Number(r);
+            const lbl = ratingLabels[n] || "";
+            return { value: r, label: `${r} - ${lbl} (${ratingCounts[r] || 0})` };
+          })
+        );
+
+        fillSelect("filterReviewer", reviewerOptions);
+        fillSelect("filterMonth", monthOptions);
+        fillSelect("filterRating", ratingOptions);
+const status = document.getElementById("filterStatus");
         if (status) status.textContent = "Showing " + records.length + " soups";
 
         function applyFilters() {
