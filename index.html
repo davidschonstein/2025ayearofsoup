@@ -68,10 +68,112 @@
       #soup-controls a { font-size: 14px; }
     }
 
-  </style>
+  /* === Photo experience upgrade === */
+.popup-thumb-wrap { margin-top: 8px; }
+.popup-thumb {
+  width: 100%;
+  max-width: 340px;
+  border-radius: 10px;
+  display: block;
+  box-shadow: 0 4px 18px rgba(0,0,0,0.12);
+}
+.popup-thumb:active { transform: scale(0.99); }
+
+/* Modal */
+.photo-modal { position: fixed; inset: 0; display: none; z-index: 9999; }
+.photo-modal[aria-hidden="false"] { display: block; }
+.photo-modal-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,0.55); }
+.photo-modal-content {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(92vw, 820px);
+  max-height: min(86vh, 860px);
+  background: #fff;
+  border-radius: 16px;
+  padding: 14px 14px 10px;
+  box-shadow: 0 14px 50px rgba(0,0,0,0.35);
+  overflow: hidden;
+}
+.photo-modal-body { width: 100%; height: calc(min(86vh, 860px) - 90px); overflow: auto; }
+.photo-modal-body img {
+  width: 100%;
+  height: auto;
+  border-radius: 12px;
+  display: block;
+}
+.photo-modal-body iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  border-radius: 12px;
+}
+.photo-modal-close {
+  position: absolute;
+  right: 10px;
+  top: 10px;
+  width: 40px;
+  height: 40px;
+  border-radius: 20px;
+  border: 1px solid rgba(0,0,0,0.12);
+  background: #fff;
+  font-size: 26px;
+  line-height: 34px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.photo-modal-actions { margin-top: 8px; font-size: 13px; }
+.photo-modal-actions a { color: #0b66c3; text-decoration: none; }
+.photo-modal-actions a:hover { text-decoration: underline; }
+
+/* === Stats mini panel === */
+#statsMini {
+  margin-top: 8px;
+  padding: 8px 10px;
+  background: #f7f7f8;
+  border: 1px solid rgba(0,0,0,0.07);
+  border-radius: 12px;
+  font-size: 12px;
+  color: #222;
+}
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 10px 0 6px;
+  padding: 10px;
+  background: #fafafa;
+  border: 1px solid rgba(0,0,0,0.07);
+  border-radius: 12px;
+}
+.stat { padding: 6px 8px; background: #fff; border: 1px solid rgba(0,0,0,0.06); border-radius: 10px; }
+.stat-label { font-size: 11px; color: #666; }
+.stat-value { font-size: 14px; font-weight: 800; margin-top: 2px; color: #111; }
+
+@media (max-width: 600px) {
+  .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .photo-modal-content {
+    width: calc(100vw - 22px);
+    max-height: calc(100vh - 40px);
+    padding: 12px 12px 10px;
+  }
+  .photo-modal-body { height: calc(100vh - 140px); }
+}
+</style>
 </head>
 <body>
   <div id="map"></div>
+<div id="photoModal" class="photo-modal" aria-hidden="true">
+  <div class="photo-modal-backdrop" id="photoModalBackdrop"></div>
+  <div class="photo-modal-content" role="dialog" aria-modal="true" aria-label="Soup photo">
+    <button class="photo-modal-close" id="photoModalClose" type="button" aria-label="Close photo">&times;</button>
+    <div id="photoModalBody" class="photo-modal-body"></div>
+    <div class="photo-modal-actions">
+      <a id="photoModalOpenLink" href="#" target="_blank" rel="noopener">Open in new tab</a>
+    </div>
+  </div>
+</div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
           integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
@@ -105,6 +207,124 @@
         return false;
       }
     }
+
+
+function normalizePhotoUrl(raw) {
+  const s = String(raw || "").trim();
+  if (!isValidHttpUrl(s)) return null;
+  const href = s;
+  let embed = null;
+
+  // Google Drive file links -> direct image view
+  let m = href.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/);
+  if (m && m[1]) embed = `https://drive.google.com/uc?export=view&id=${m[1]}`;
+  if (!embed) {
+    m = href.match(/drive\.google\.com\/open\?id=([a-zA-Z0-9_-]+)/);
+    if (m && m[1]) embed = `https://drive.google.com/uc?export=view&id=${m[1]}`;
+  }
+  if (!embed) {
+    const lower = href.toLowerCase();
+    if (lower.match(/\.(png|jpe?g|gif|webp)(\?.*)?$/)) embed = href;
+    if (lower.includes("googleusercontent.com")) embed = href;
+  }
+  return { href, embed };
+}
+
+function openPhotoModal(url) {
+  if (!url) return false;
+  const modal = document.getElementById("photoModal");
+  const body = document.getElementById("photoModalBody");
+  const openLink = document.getElementById("photoModalOpenLink");
+  if (!modal || !body || !openLink) return false;
+
+  const norm = normalizePhotoUrl(url) || { href: url, embed: null };
+  body.innerHTML = "";
+
+  if (norm.embed) {
+    const img = document.createElement("img");
+    img.alt = "Soup photo";
+    img.src = norm.embed;
+    img.loading = "eager";
+    img.onerror = () => {
+      body.innerHTML = "";
+      const ifr = document.createElement("iframe");
+      ifr.src = norm.href;
+      body.appendChild(ifr);
+    };
+    body.appendChild(img);
+  } else {
+    const ifr = document.createElement("iframe");
+    ifr.src = norm.href;
+    body.appendChild(ifr);
+  }
+
+  openLink.href = norm.href;
+  modal.setAttribute("aria-hidden", "false");
+  document.body.style.overflow = "hidden";
+  return false;
+}
+
+function closePhotoModal() {
+  const modal = document.getElementById("photoModal");
+  if (!modal) return;
+  modal.setAttribute("aria-hidden", "true");
+  document.body.style.overflow = "";
+  const body = document.getElementById("photoModalBody");
+  if (body) body.innerHTML = "";
+}
+
+window.addEventListener("DOMContentLoaded", () => {
+  const b = document.getElementById("photoModalBackdrop");
+  const c = document.getElementById("photoModalClose");
+  if (b) b.addEventListener("click", closePhotoModal, { passive: true });
+  if (c) c.addEventListener("click", closePhotoModal, { passive: true });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") closePhotoModal(); });
+});
+
+function median(nums) {
+  const a = nums.slice().sort((x,y)=>x-y);
+  if (!a.length) return null;
+  const mid = Math.floor(a.length/2);
+  return a.length % 2 ? a[mid] : (a[mid-1] + a[mid]) / 2;
+}
+
+function updateStats(visibleRecords, allRecords) {
+  const vis = visibleRecords || [];
+  const all = allRecords || [];
+
+  const ratedNums = vis.map(r => r.ratingNum).filter(v => typeof v === "number" && isFinite(v));
+  const ratedCount = ratedNums.length;
+  const avg = ratedCount ? (ratedNums.reduce((s,v)=>s+v,0)/ratedCount) : null;
+  const med = ratedCount ? median(ratedNums) : null;
+
+  const countriesSet = new Set();
+  const citiesSet = new Set();
+  for (const r of vis) {
+    const country = String(r.country || "").trim();
+    if (country && country.toLowerCase() !== "unknown") countriesSet.add(country);
+    const cs = String(r.cityState || "").trim();
+    if (cs && !cs.toLowerCase().includes("unknown")) citiesSet.add(cs);
+  }
+
+  const setText = (id, val) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = val;
+  };
+
+  setText("statShown", String(vis.length));
+  setText("statTotal", String(all.length));
+  setText("statRated", String(ratedCount));
+  setText("statAvg", avg === null ? "—" : avg.toFixed(2));
+  setText("statMedian", med === null ? "—" : med.toFixed(2));
+  setText("statCountries", String(countriesSet.size));
+  setText("statCities", String(citiesSet.size));
+
+  const mini = document.getElementById("statsMini");
+  if (mini) {
+    const avgTxt = avg === null ? "—" : avg.toFixed(2);
+    mini.textContent = `Shown ${vis.length}/${all.length} • Avg ${avgTxt} (n=${ratedCount}) • ${countriesSet.size} countries • ${citiesSet.size} cities`;
+  }
+}
 
     function getField(row, candidates) {
       for (const k of candidates) {
@@ -345,6 +565,16 @@ function parseMonth(dateStr) {
               ">Filters <span style="font-weight:700; color: rgba(0,0,0,0.6);">tap to expand</span></summary>
 
               <div style="height:8px;"></div>
+
+            <div class="stats-grid" aria-label="Stats">
+              <div class="stat"><div class="stat-label">Shown</div><div class="stat-value" id="statShown">0</div></div>
+              <div class="stat"><div class="stat-label">Total</div><div class="stat-value" id="statTotal">0</div></div>
+              <div class="stat"><div class="stat-label">Rated</div><div class="stat-value" id="statRated">0</div></div>
+              <div class="stat"><div class="stat-label">Avg</div><div class="stat-value" id="statAvg">—</div></div>
+              <div class="stat"><div class="stat-label">Median</div><div class="stat-value" id="statMedian">—</div></div>
+              <div class="stat"><div class="stat-label">Countries</div><div class="stat-value" id="statCountries">—</div></div>
+              <div class="stat"><div class="stat-label">Cities</div><div class="stat-value" id="statCities">—</div></div>
+            </div>
 
               <div style="display:grid; grid-template-columns: 1fr; gap:8px;">
                 <div>
