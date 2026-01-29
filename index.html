@@ -21,7 +21,22 @@
     /* Control panel sizing/position */
     #soup-controls { width: 270px; transform: translate(-60px, -60px); }
     @media (max-width: 520px) {
-      #soup-controls { width: 220px; transform: translate(0px, 0px); }
+      /* Center the panel between zoom (left) and layers (right) controls */
+      #soup-controls {
+        position: absolute !important;
+        top: 10px !important;
+        left: 50% !important;
+        right: auto !important;
+        margin: 0 !important;
+        width: calc(100vw - 120px) !important; /* leaves room for Leaflet buttons */
+        max-width: 360px;
+        min-width: 220px;
+        transform: translateX(-50%) !important;
+        z-index: 1001;
+      }
+      #soup-controls summary { padding: 6px 8px; }
+      #soup-controls select { font-size: 12px; }
+    }
       #soup-controls summary { padding: 6px 8px; }
       #soup-controls select { font-size: 12px; }
     }
