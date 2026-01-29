@@ -533,9 +533,11 @@ function wire() {
         
         // Build counts for dropdown labels (based on all records)
         const reviewerCounts = {};
+        const monthCounts = {};
         const ratingCounts = {};
         records.forEach(rec => {
           reviewerCounts[rec.reviewer] = (reviewerCounts[rec.reviewer] || 0) + 1;
+          monthCounts[rec.month] = (monthCounts[rec.month] || 0) + 1;
           ratingCounts[rec.rating] = (ratingCounts[rec.rating] || 0) + 1;
         });
 
@@ -543,7 +545,9 @@ function wire() {
           reviewers.map(name => ({ value: name, label: `${name} (${reviewerCounts[name] || 0})` }))
         );
 
-        const monthOptions = ["All", ...months];
+        const monthOptions = [{ value: "All", label: "All" }].concat(
+          months.map(m => ({ value: m, label: `${m} (${monthCounts[m] || 0})` }))
+        );
 
         const ratingOptions = [{ value: "All", label: "All" }].concat(
           ratings.map(r => {
