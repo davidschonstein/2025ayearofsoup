@@ -298,6 +298,27 @@
   }
   .stats-mini{ padding:12px !important; }
 }
+
+
+/* --- Fix: keep filters + timeline inside panel (mobile) --- */
+.filters-grid{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  margin-top:12px;
+}
+.filters-grid > div{width:100%;}
+.filters-grid select{width:100%; max-width:100%;}
+
+/* Ensure the controls panel contains its own scroll on small screens */
+@media (max-width: 700px){
+  .custom-soup-control{ width: min(94vw, 420px) !important; }
+  #soup-controls{ max-height: calc(100vh - 120px); overflow-y: auto; -webkit-overflow-scrolling: touch; }
+  .stats-mini-top{ display:flex; gap:8px; }
+  .stats-pill{ flex: 1 1 0; min-width: 0; }
+  .stats-pill .label{ font-size: 12px; }
+  .stats-pill .value{ font-size: 16px; }
+}
 </style>
 </head>
 <body>
@@ -766,16 +787,24 @@ function parseMonth(dateStr) {
   </div>
 </div>
 
-<div style="font-size:11px; font-weight:700; margin-bottom:4px;">Reviewer</div>
-                  <select id="filterReviewer" style="width:100%; padding:7px 8px; border-radius:10px; border:1px solid rgba(0,0,0,0.16); font-size:12px;"></select>
+<div class="filters-grid">
+                <div>
+                  <div style="font-size:11px; font-weight:700; margin-bottom:4px;">Reviewer</div>
+                  <select id="filterReviewer" style="width:100%; padding:10px 12px; border-radius:14px; border:2px solid rgba(0,0,0,0.14); background:#f2f2f2; font-size:16px;">
+                    <option value="All">All</option>
+                  </select>
                 </div>
                 <div>
                   <div style="font-size:11px; font-weight:700; margin-bottom:4px;">Month</div>
-                  <select id="filterMonth" style="width:100%; padding:7px 8px; border-radius:10px; border:1px solid rgba(0,0,0,0.16); font-size:12px;"></select>
+                  <select id="filterMonth" style="width:100%; padding:10px 12px; border-radius:14px; border:2px solid rgba(0,0,0,0.14); background:#f2f2f2; font-size:16px;">
+                    <option value="All">All</option>
+                  </select>
                 </div>
                 <div>
                   <div style="font-size:11px; font-weight:700; margin-bottom:4px;">Rating</div>
-                  <select id="filterRating" style="width:100%; padding:7px 8px; border-radius:10px; border:1px solid rgba(0,0,0,0.16); font-size:12px;"></select>
+                  <select id="filterRating" style="width:100%; padding:10px 12px; border-radius:14px; border:2px solid rgba(0,0,0,0.14); background:#f2f2f2; font-size:16px;">
+                    <option value="All">All</option>
+                  </select>
                 </div>
               </div>
 
