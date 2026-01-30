@@ -267,6 +267,37 @@
     -webkit-overflow-scrolling:touch;
   }
 }
+/* --- Mobile/Stats polish overrides --- */
+.stats-mini-top{
+  display:grid !important;
+  grid-template-columns:repeat(3, minmax(0, 1fr)) !important;
+  gap:10px !important;
+}
+.stat-pill{
+  min-width:0 !important;
+  padding:10px 10px !important;
+}
+.stat-label{ font-size:13px !important; }
+.stat-value{ font-size:14px !important; font-weight:800 !important; margin-top:4px !important; }
+
+.stats-mini-bestworst{
+  display:grid !important;
+  grid-template-columns:1fr !important;
+  gap:10px !important;
+  margin-top:10px !important;
+}
+.bw-title{ font-weight:700 !important; font-size:13px !important; color:#222 !important; }
+.bw-text{ font-size:13px !important; color:#333 !important; line-height:1.25 !important; word-break:break-word !important; }
+
+@media (max-width: 640px){
+  #controls{
+    width: min(390px, calc(100vw - 120px)) !important;
+    max-height: calc(100vh - 24px) !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch;
+  }
+  .stats-mini{ padding:12px !important; }
+}
 </style>
 </head>
 <body>
@@ -410,73 +441,53 @@ function median(nums) {
 }
 
 function updateMiniStats(visibleRecs) {
-  const reviewsEl = document.getElementById('statReviews');
-  const countriesEl = document.getElementById('statCountries');
-  const citiesEl = document.getElementById('statCities');
-  const bestOl = document.getElementById('statBest3');
-  const worstOl = document.getElementById('statWorst3');
-  if (!reviewsEl || !countriesEl || !citiesEl || !bestOl || !worstOl) return;
+  const reviewsEl = document.getElementById("statTotalReviews");
+  const countriesEl = document.getElementById("statTotalCountries");
+  const citiesEl = document.getElementById("statTotalCities");
+  const bestEl = document.getElementById("statBest1");
+  const worstEl = document.getElementById("statWorst1");
+  if (!reviewsEl || !countriesEl || !citiesEl || !bestEl || !worstEl) return;
 
-  const norm = (v) => (v == null ? '' : String(v)).trim();
-  const isUnknown = (v) => {
-    const t = norm(v).toLowerCase();
-    return !t || t === 'unknown' || t === '—' || t === '-' || t === 'na' || t === 'n/a';
-  };
+  const recs = Array.isArray(visibleRecs) ? visibleRecs : [];
+  reviewsEl.textContent = String(recs.length);
 
-  // Totals
-  const total = Array.isArray(visibleRecs) ? visibleRecs.length : 0;
-  reviewsEl.textContent = String(total);
+  const countries = new Set();
+  const cities = new Set();
 
-  // Countries / Cities (robust to either dedicated columns or "Location" like "City, Country")
-  const countrySet = new Set();
-  const citySet = new Set();
+  for (const rec of recs) {
+    const s = (rec && rec.stats) ? rec.stats : {};
+    const ctry = (s.Country ?? s.country ?? "").toString().trim();
+    const city = (s.City ?? s.city ?? "").toString().trim();
+    const state = (s.State ?? s.state ?? "").toString().trim();
 
-  (visibleRecs || []).forEach((rec) => {
-    let country = getField(rec, ['Country', 'country', 'COUNTRY', 'Nation', 'nation']);
-    let city = getField(rec, ['City', 'city', 'CITY', 'Town', 'town']);
-    const location = getField(rec, ['Location', 'location', 'LOCATION', 'Place', 'place']);
-
-    if ((isUnknown(country) || !country || isUnknown(city) || !city) && location) {
-      const parts = norm(location).split(',').map(p => p.trim()).filter(Boolean);
-      if (parts.length >= 2) {
-        if (isUnknown(city) || !city) city = parts[0];
-        if (isUnknown(country) || !country) country = parts[parts.length - 1];
-      }
+    if (ctry && ctry.toLowerCase() !== "unknown") countries.add(ctry);
+    if (city && city.toLowerCase() !== "unknown") {
+      const key = state ? `${city}, ${state}` : city;
+      cities.add(key);
     }
+  }
 
-    if (!isUnknown(country)) countrySet.add(norm(country));
-    if (!isUnknown(city)) citySet.add(norm(city));
-  });
+  countriesEl.textContent = String(countries.size);
+  citiesEl.textContent = String(cities.size);
 
-  countriesEl.textContent = String(countrySet.size);
-  citiesEl.textContent = String(citySet.size);
+  const rated = recs
+    .filter((r) => r && Number.isFinite(r.ratingNum))
+    .slice()
+    .sort((a, b) => (b.ratingNum - a.ratingNum) || ((b.dateObj?.getTime?.() || 0) - (a.dateObj?.getTime?.() || 0)));
 
-  // Best / Worst (single each)
-  const rated = (visibleRecs || []).map((rec) => {
-    const rRaw = getField(rec, ['Rating', 'rating', 'RATING', 'Score', 'score', 'SCORE']);
-    const r = parseFloat(rRaw);
-    if (Number.isFinite(r)) return { rec, r };
-    return null;
-  }).filter(Boolean);
+  const best = rated.length ? rated[0] : null;
+  const worst = rated.length ? rated[rated.length - 1] : null;
 
-  const renderItem = (item) => {
-    if (!item) return '—';
-    const rec = item.rec || {};
-    const reviewer = getField(rec, ['Reviewer', 'reviewer', 'REVIEWER', 'Name', 'name']) || 'Unknown';
-    const soup = getField(rec, ['Soup', 'soup', 'SOUP', 'Soup Name', 'SoupName', 'Dish', 'dish']) || 'Unknown soup';
-    const rStr = item.r.toFixed(1);
-    return `<strong>${escapeHTML(reviewer)}</strong> — ${escapeHTML(soup)} <span class="bw-rating">(${rStr})</span>`;
+  const fmt = (rec) => {
+    if (!rec) return "—";
+    const soup = (rec.stats && (rec.stats.Soup || rec.stats.soup)) ? (rec.stats.Soup || rec.stats.soup) : (rec.soup || "Unknown soup");
+    const reviewer = rec.reviewer || "Unknown";
+    const rating = Number.isFinite(rec.ratingNum) ? rec.ratingNum.toFixed(1) : "—";
+    return `${reviewer} — ${soup} (${rating})`;
   };
 
-  if (rated.length) {
-    const best = rated.reduce((a, b) => (b.r > a.r ? b : a), rated[0]);
-    const worst = rated.reduce((a, b) => (b.r < a.r ? b : a), rated[0]);
-    bestOl.innerHTML = `<li>${renderItem(best)}</li>`;
-    worstOl.innerHTML = `<li>${renderItem(worst)}</li>`;
-  } else {
-    bestOl.innerHTML = `<li>—</li>`;
-    worstOl.innerHTML = `<li>—</li>`;
-  }
+  bestEl.textContent = fmt(best);
+  worstEl.textContent = fmt(worst);
 }
 function getField(row, candidates) {
       if (!row) return "";
@@ -735,37 +746,27 @@ function parseMonth(dateStr) {
 
               <div style="height:8px;"></div>
 
-            <div class="stats-mini" aria-label="Stats">
+            
+<div class="stats-mini" aria-label="Stats">
   <div class="stats-mini-top">
-    <div class="stat-pill">
-      <div class="stat-label">Reviews</div>
-      <div class="stat-value" id="statTotalReviews">0</div>
-    </div>
-    <div class="stat-pill">
-      <div class="stat-label">Countries</div>
-      <div class="stat-value" id="statTotalCountries">0</div>
-    </div>
-    <div class="stat-pill">
-      <div class="stat-label">Cities</div>
-      <div class="stat-value" id="statTotalCities">0</div>
-    </div>
+    <div class="stat-pill"><div class="stat-label">Reviews</div><div class="stat-value" id="statTotalReviews">0</div></div>
+    <div class="stat-pill"><div class="stat-label">Countries</div><div class="stat-value" id="statTotalCountries">0</div></div>
+    <div class="stat-pill"><div class="stat-label">Cities</div><div class="stat-value" id="statTotalCities">0</div></div>
   </div>
 
-  <div class="stats-mini-lists">
-    <div class="stats-mini-list">
-      <div class="stats-mini-title">Best</div>
-      <ol id="statBest3" class="stats-mini-ol"></ol>
+  <div class="stats-mini-bestworst">
+    <div class="bw-item">
+      <div class="bw-title">Best</div>
+      <div class="bw-text" id="statBest1">—</div>
     </div>
-    <div class="stats-mini-list">
-      <div class="stats-mini-title">Worst</div>
-      <ol id="statWorst3" class="stats-mini-ol"></ol>
+    <div class="bw-item">
+      <div class="bw-title">Worst</div>
+      <div class="bw-text" id="statWorst1">—</div>
     </div>
   </div>
 </div>
 
-              <div style="display:grid; grid-template-columns: 1fr; gap:8px;">
-                <div>
-                  <div style="font-size:11px; font-weight:700; margin-bottom:4px;">Reviewer</div>
+<div style="font-size:11px; font-weight:700; margin-bottom:4px;">Reviewer</div>
                   <select id="filterReviewer" style="width:100%; padding:7px 8px; border-radius:10px; border:1px solid rgba(0,0,0,0.16); font-size:12px;"></select>
                 </div>
                 <div>
