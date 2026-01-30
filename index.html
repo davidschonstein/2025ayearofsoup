@@ -1030,6 +1030,7 @@ const status = document.getElementById("filterStatus");
 
           cluster.clearLayers();
           let shown = 0;
+          const visible = [];
 
           records.forEach(rec => {
             let ok = true;
@@ -1039,11 +1040,11 @@ const status = document.getElementById("filterStatus");
 
             if (timelineMaxDate && rec.dateObj) ok = ok && (rec.dateObj <= timelineMaxDate);
 
-            if (ok) { cluster.addLayer(rec.marker); shown++; }
+            if (ok) { cluster.addLayer(rec.marker); shown++; visible.push(rec); }
           });
 
-          if (status) updateMiniStats(result.map(r=>r.stats || {}));
-  status.textContent = "Showing " + shown + " soups";
+          updateMiniStats(visible);
+          if (status) status.textContent = "Showing " + shown + " soups";
         }
 
         function clearFilters() {
