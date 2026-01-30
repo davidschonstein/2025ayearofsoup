@@ -12,6 +12,8 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
 
   <style>
+*{box-sizing:border-box;}
+
     html, body { height: 100%; margin: 0; }
     #map { height: 100vh; width: 100vw; }
     #filtersDetails > summary::-webkit-details-marker { display:none; }
@@ -19,7 +21,8 @@
   
 
     /* Control panel sizing/position */
-    #soup-controls { width: 270px; transform: translate(-60px, -60px); }
+    #soup-controls{ width: 270px; transform: translate(-60px, -60px);
+  overflow-x:hidden;}
     #soup-controls summary { padding: 6px 8px; }
       #soup-controls select { font-size: 12px; }
     }
@@ -49,6 +52,8 @@
 
   
     @media (max-width: 520px) {
+  #soup-controls{padding-bottom: calc(90px + env(safe-area-inset-bottom));}
+
       /* Force the panel to be centered between zoom (left) and layers (right) */
       #soup-controls {
         position: fixed !important;
@@ -152,6 +157,9 @@
 .stat-value { font-size: 14px; font-weight: 800; margin-top: 2px; color: #111; }
 
 @media (max-width: 600px) {
+  .stats-mini-top{gap:8px;}
+  .stat-pill{padding:8px 10px;}
+
   .stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .photo-modal-content {
     width: calc(100vw - 22px);
@@ -164,13 +172,13 @@
 
 /* --- Mini stats (compact + mobile-friendly) --- */
 .stats-mini{ margin:10px 0 14px; padding:10px; border:1px solid rgba(0,0,0,.06); border-radius:14px; background:#fff; box-shadow:0 8px 22px rgba(0,0,0,.08);}
-.stats-mini-top{ display:grid; grid-template-columns: repeat(3, 1fr); gap:10px; }
-.stat-pill{ min-width:0; border:1px solid rgba(0,0,0,.07); border-radius:14px; padding:10px; background:rgba(0,0,0,.015); }
+.stats-mini-top{display:flex;gap:10px;width:100%;max-width:100%;overflow:hidden;}
+.stat-pill{flex:1 1 0;min-width:0;border:1px solid rgba(0,0,0,.08);background:#fff;border-radius:16px;padding:10px 12px;}
 .stat-label{ font-size:13px; color:#5a5a5a; margin-bottom:4px; }
 .stat-value{ font-size:14px; font-weight:700; line-height:1.1; }
 @media (max-width:520px){
-  .stats-mini-top{ gap:8px; }
-  .stat-pill{ padding:8px; }
+  .stats-mini-top{display:flex;gap:10px;width:100%;max-width:100%;overflow:hidden;}
+  .stat-pill{flex:1 1 0;min-width:0;border:1px solid rgba(0,0,0,.08);background:#fff;border-radius:16px;padding:10px 12px;}
   .stat-label{ font-size:12px; }
   .stat-value{ font-size:13px; }
 }
@@ -182,7 +190,7 @@
 @media (max-width: 520px){
   .stats-mini{ padding:10px; }
   .stats-mini-lists{ grid-template-columns: 1fr; }
-  .stat-pill{ min-width:88px; padding:9px; }
+  .stat-pill{flex:1 1 0;min-width:0;border:1px solid rgba(0,0,0,.08);background:#fff;border-radius:16px;padding:10px 12px;}
   .stat-value{ font-size:18px; }
 }
 
@@ -217,16 +225,16 @@
   .custom-soup-control #soup-controls{ width: calc(100vw - 120px); }
 }
 .stats-mini{ padding: 10px; }
-.stats-mini-top{ gap: 8px; }
-.stat-pill{ padding: 8px 10px; }
+.stats-mini-top{display:flex;gap:10px;width:100%;max-width:100%;overflow:hidden;}
+.stat-pill{flex:1 1 0;min-width:0;border:1px solid rgba(0,0,0,.08);background:#fff;border-radius:16px;padding:10px 12px;}
 .stat-pill .stat-label{ font-size: 12px; }
 .stat-pill .stat-value{ font-size: 16px; }
 .stats-mini-lists ol{ font-size: 12px; line-height: 1.25; }
 .bw-item{ display:block; }
 .bw-rating{ opacity: 0.75; }
 @media (max-width: 480px){
-  .stats-mini-top{ gap: 6px; }
-  .stat-pill{ padding: 6px 8px; }
+  .stats-mini-top{display:flex;gap:10px;width:100%;max-width:100%;overflow:hidden;}
+  .stat-pill{flex:1 1 0;min-width:0;border:1px solid rgba(0,0,0,.08);background:#fff;border-radius:16px;padding:10px 12px;}
   .stat-pill .stat-label{ font-size: 11px; }
   .stat-pill .stat-value{ font-size: 14px; }
   .stats-mini-lists{ grid-template-columns: 1fr; gap: 10px; }
@@ -411,8 +419,8 @@ function updateMiniStats(visibleRecs){
 
         const sortedDesc = rated.slice().sort((a,b)=> b._rating - a._rating);
         const sortedAsc = rated.slice().sort((a,b)=> a._rating - b._rating);
-        const best3 = sortedDesc.slice(0,3);
-        const worst3 = sortedAsc.slice(0,3);
+        const best3 = sortedDesc.slice(0,1);
+        const worst3 = sortedAsc.slice(0,1);
 
         const pickText = (rec, keys) => {
           const s = rec.stats || rec.raw || {};
@@ -423,19 +431,18 @@ function updateMiniStats(visibleRecs){
           return '';
         };
 
-        const fmtItem = (rec) => {
-          const reviewer = (rec.reviewer && rec.reviewer.trim()) || pickText(rec, ['Reviewer','reviewer']) || 'Unknown reviewer';
-          const soup = pickText(rec, ['Soup','Soup Name','soup','soup_name']) || 'Unknown soup';
-          const r = Number.isFinite(rec._rating) ? rec._rating : getRatingNum(rec);
-          const ratingTxt = Number.isFinite(r) ? r.toFixed(1) : '—';
-          return `<li><span class="bw-item"><strong>${escapeHTML(reviewer)}</strong> — ${escapeHTML(soup)} <span class="bw-rating">(${ratingTxt})</span></span></li>`;
-        };
+        
+  const fmtOne = (rec) => {
+    if (!rec) return '—';
+    const reviewer = (rec.reviewer || 'Unknown').trim() || 'Unknown';
+    const soup = (rec.soup || 'Unknown soup').trim() || 'Unknown soup';
+    const r = (typeof rec.rating === 'number' && isFinite(rec.rating)) ? rec.rating.toFixed(1) : '—';
+    return `<span class="bw-item"><strong>${escapeHtml(reviewer)}</strong> — ${escapeHtml(soup)} <span class="bw-rating">(${r})</span></span>`;
+  };
 
-        if(bestEl){
-          bestEl.innerHTML = best3.length ? `<ol>${best3.map(fmtItem).join('')}</ol>` : `<ol><li>—</li></ol>`;
-        }
-        if(worstEl){
-          worstEl.innerHTML = worst3.length ? `<ol>${worst3.map(fmtItem).join('')}</ol>` : `<ol><li>—</li></ol>`;
+  if(bestEl){ bestEl.innerHTML = fmtOne(best3[0]); }
+  if(worstEl){ worstEl.innerHTML = fmtOne(worst3[0]); }
+</ol>` : `<ol><li>—</li></ol>`;
         }
       }
 
@@ -700,25 +707,25 @@ function parseMonth(dateStr) {
   <div class="stats-mini-top">
     <div class="stat-pill">
       <div class="stat-label">Reviews</div>
-      <div class="stat-value" id="statReviews">0</div>
+      <div class="stat-value" id="statTotalReviews">0</div>
     </div>
     <div class="stat-pill">
       <div class="stat-label">Countries</div>
-      <div class="stat-value" id="statCountries">0</div>
+      <div class="stat-value" id="statTotalCountries">0</div>
     </div>
     <div class="stat-pill">
       <div class="stat-label">Cities</div>
-      <div class="stat-value" id="statCities">0</div>
+      <div class="stat-value" id="statTotalCities">0</div>
     </div>
   </div>
 
   <div class="stats-mini-lists">
     <div class="stats-mini-list">
-      <div class="stats-mini-title">Best 3</div>
+      <div class="stats-mini-title">Best</div>
       <ol id="statBest3" class="stats-mini-ol"></ol>
     </div>
     <div class="stats-mini-list">
-      <div class="stats-mini-title">Worst 3</div>
+      <div class="stats-mini-title">Worst</div>
       <ol id="statWorst3" class="stats-mini-ol"></ol>
     </div>
   </div>
