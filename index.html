@@ -319,6 +319,59 @@
   .stats-pill .label{ font-size: 12px; }
   .stats-pill .value{ font-size: 16px; }
 }
+
+/* === Mobile polish + compact stats (cosmetic only) === */
+#soup-controls { font-size: 12px; }
+#soup-controls, #soup-controls * { font-size: 12px; }
+
+#soup-controls select, #soup-controls button, #soup-controls .tabs a {
+  font-size: 12px !important;
+}
+
+#soup-controls .tabs { margin-bottom: 10px; }
+#soup-controls .tab-dot { font-size: 12px !important; }
+
+.stats-mini { padding: 10px 12px; }
+.stats-line{
+  display:flex;
+  flex-wrap: nowrap;
+  gap: 10px;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 8px;
+}
+.stats-line span{ white-space: nowrap; }
+.stats-line strong{ font-weight: 700; }
+.stats-bestworst{ display:flex; flex-direction: column; gap: 6px; }
+.bw-row{ line-height: 1.2; }
+.bw-title{ font-weight: 700; margin-right: 6px; }
+
+@media (max-width: 640px){
+  /* Make panel wider but keep clear of zoom (left) + layers (right) controls */
+  .custom-soup-control{
+    position: fixed !important;
+    top: calc(env(safe-area-inset-top) + 10px) !important;
+    left: 56px !important;
+    right: 56px !important;
+    width: auto !important;
+    max-width: none !important;
+    margin: 0 !important;
+    transform: none !important;
+  }
+
+  #soup-controls{
+    max-height: calc(100vh - 120px) !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Reduce vertical bulk so timeline stays reachable */
+  #soup-controls .filters-grid { gap: 10px !important; }
+  #soup-controls label { margin: 8px 0 6px !important; }
+  #soup-controls select { padding: 10px 12px !important; }
+  #soup-controls .btn-row button { padding: 10px 12px !important; }
+}
+
 </style>
 </head>
 <body>
@@ -769,21 +822,14 @@ function parseMonth(dateStr) {
 
             
 <div class="stats-mini" aria-label="Stats">
-  <div class="stats-mini-top">
-    <div class="stat-pill"><div class="stat-label">Reviews</div><div class="stat-value" id="statTotalReviews">0</div></div>
-    <div class="stat-pill"><div class="stat-label">Countries</div><div class="stat-value" id="statTotalCountries">0</div></div>
-    <div class="stat-pill"><div class="stat-label">Cities</div><div class="stat-value" id="statTotalCities">0</div></div>
+  <div class="stats-line">
+    <span>Reviews <strong id="statTotalReviews">0</strong></span>
+    <span>Countries <strong id="statTotalCountries">0</strong></span>
+    <span>Cities <strong id="statTotalCities">0</strong></span>
   </div>
-
-  <div class="stats-mini-bestworst">
-    <div class="bw-item">
-      <div class="bw-title">Best</div>
-      <div class="bw-text" id="statBest1">—</div>
-    </div>
-    <div class="bw-item">
-      <div class="bw-title">Worst</div>
-      <div class="bw-text" id="statWorst1">—</div>
-    </div>
+  <div class="stats-bestworst">
+    <div class="bw-row"><span class="bw-title">Best:</span> <span class="bw-text" id="statBest1">—</span></div>
+    <div class="bw-row"><span class="bw-title">Worst:</span> <span class="bw-text" id="statWorst1">—</span></div>
   </div>
 </div>
 
