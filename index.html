@@ -202,6 +202,36 @@
   .photo-thumb{ max-width: 220px; }
   .photo-preview-btn{ padding:7px 10px; }
 }
+
+/* --- Mobile & panel usability overrides (v16) --- */
+.custom-soup-control #soup-controls{
+  width: 360px;
+  max-width: calc(100vw - 120px); /* leave room for zoom (left) + layers (right) */
+  max-height: calc(100vh - 24px);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  padding-bottom: calc(12px + env(safe-area-inset-bottom));
+}
+@media (max-width: 520px){
+  .custom-soup-control #soup-controls{ width: calc(100vw - 120px); }
+}
+.stats-mini{ padding: 10px; }
+.stats-mini-top{ gap: 8px; }
+.stat-pill{ padding: 8px 10px; }
+.stat-pill .stat-label{ font-size: 12px; }
+.stat-pill .stat-value{ font-size: 16px; }
+.stats-mini-lists ol{ font-size: 12px; line-height: 1.25; }
+.bw-item{ display:block; }
+.bw-rating{ opacity: 0.75; }
+@media (max-width: 480px){
+  .stats-mini-top{ gap: 6px; }
+  .stat-pill{ padding: 6px 8px; }
+  .stat-pill .stat-label{ font-size: 11px; }
+  .stat-pill .stat-value{ font-size: 14px; }
+  .stats-mini-lists{ grid-template-columns: 1fr; gap: 10px; }
+  .stats-mini-lists ol{ font-size: 12px; }
+}
 </style>
 </head>
 <body>
@@ -345,51 +375,69 @@ function median(nums) {
 }
 
 function updateMiniStats(visibleRecs){
-  try{
-    const statReviewsEl = document.getElementById('statReviews');
-    const statCountriesEl = document.getElementById('statCountries');
-    const statCitiesEl = document.getElementById('statCities');
-    const bestList = document.getElementById('statBest3');
-    const worstList = document.getElementById('statWorst3');
-    if(!statReviewsEl || !statCountriesEl || !statCitiesEl || !bestList || !worstList) return;
+        const totalEl = document.getElementById('statTotalReviews');
+        const countriesEl = document.getElementById('statTotalCountries');
+        const citiesEl = document.getElementById('statTotalCities');
+        const bestEl = document.getElementById('statBest3');
+        const worstEl = document.getElementById('statWorst3');
 
-    const visible = Array.isArray(visibleRecs) ? visibleRecs : [];
-    statReviewsEl.textContent = String(visible.length);
+        const getRatingNum = (rec) => {
+          if (Number.isFinite(rec?.ratingNum)) return rec.ratingNum;
+          const s = rec?.stats || rec?.raw || {};
+          const val = s.Rating;
+          const num = parseFloat(String(val).replace(',', '.'));
+          return Number.isFinite(num) ? num : NaN;
+        };
 
-    // Unique Countries / Cities (based on the precomputed stats snapshot on each record)
-    const countries = new Set();
-    const cities = new Set();
-    visible.forEach(rec => {
-      const s = rec && rec.stats ? rec.stats : null;
-      if(!s) return;
-      const ctry = (s.Country ?? '').toString().trim();
-      const city = (s.City ?? '').toString().trim();
-      if(ctry && ctry.toLowerCase() !== 'unknown') countries.add(ctry);
-      if(city && city.toLowerCase() !== 'unknown') cities.add(city);
-    });
-    statCountriesEl.textContent = String(countries.size);
-    statCitiesEl.textContent = String(cities.size);
+        const total = visibleRecs.length;
+        if(totalEl) totalEl.textContent = String(total);
 
-    // Best/Worst 3 (rated only) – include Reviewer + Soup + Rating
-    const rated = visible.filter(rec => Number.isFinite(rec.rating));
-    rated.sort((a,b) => a.rating - b.rating); // ascending
-    const worst3 = rated.slice(0,3);
-    const best3 = rated.slice(-3).reverse();
+        const countries = new Set();
+        const cities = new Set();
+        for(const rec of visibleRecs){
+          const s = rec.stats || rec.raw || {};
+          const country = (s.Country || s.country || '').toString().trim();
+          const city = (s.City || s.city || '').toString().trim();
+          if(country && country.toLowerCase() !== 'unknown') countries.add(country);
+          if(city && city.toLowerCase() !== 'unknown') cities.add(city);
+        }
+        if(countriesEl) countriesEl.textContent = String(countries.size);
+        if(citiesEl) citiesEl.textContent = String(cities.size);
 
-    const fmtItem = (rec, i) => {
-      const s = (rec && rec.stats) ? rec.stats : {};
-      const reviewer = (rec && rec.reviewer ? rec.reviewer : (s.Reviewer || 'Unknown')).toString().trim() || 'Unknown';
-      const soup = (s.Soup || s['Soup Name'] || s['Soup name'] || '').toString().trim() || 'Unknown soup';
-      const ratingStr = Number.isFinite(rec.rating) ? rec.rating.toFixed(1) : '—';
-      return `<li>${i+1}. ${escapeHtml(reviewer)} — ${escapeHtml(soup)} <span class="statScore">(${escapeHtml(ratingStr)})</span></li>`;
-    };
+        // Best/Worst from rated soups only
+        const rated = visibleRecs
+          .map(r => ({...r, _rating: getRatingNum(r)}))
+          .filter(r => Number.isFinite(r._rating));
 
-    bestList.innerHTML = best3.length ? best3.map(fmtItem).join('') : '<li>—</li>';
-    worstList.innerHTML = worst3.length ? worst3.map(fmtItem).join('') : '<li>—</li>';
-  }catch(e){
-    console.warn('Mini stats error:', e);
-  }
-}
+        const sortedDesc = rated.slice().sort((a,b)=> b._rating - a._rating);
+        const sortedAsc = rated.slice().sort((a,b)=> a._rating - b._rating);
+        const best3 = sortedDesc.slice(0,3);
+        const worst3 = sortedAsc.slice(0,3);
+
+        const pickText = (rec, keys) => {
+          const s = rec.stats || rec.raw || {};
+          for(const k of keys){
+            const v = s[k];
+            if(v != null && String(v).trim() !== '' && String(v).trim().toLowerCase() !== 'unknown') return String(v).trim();
+          }
+          return '';
+        };
+
+        const fmtItem = (rec) => {
+          const reviewer = (rec.reviewer && rec.reviewer.trim()) || pickText(rec, ['Reviewer','reviewer']) || 'Unknown reviewer';
+          const soup = pickText(rec, ['Soup','Soup Name','soup','soup_name']) || 'Unknown soup';
+          const r = Number.isFinite(rec._rating) ? rec._rating : getRatingNum(rec);
+          const ratingTxt = Number.isFinite(r) ? r.toFixed(1) : '—';
+          return `<li><span class="bw-item"><strong>${escapeHTML(reviewer)}</strong> — ${escapeHTML(soup)} <span class="bw-rating">(${ratingTxt})</span></span></li>`;
+        };
+
+        if(bestEl){
+          bestEl.innerHTML = best3.length ? `<ol>${best3.map(fmtItem).join('')}</ol>` : `<ol><li>—</li></ol>`;
+        }
+        if(worstEl){
+          worstEl.innerHTML = worst3.length ? `<ol>${worst3.map(fmtItem).join('')}</ol>` : `<ol><li>—</li></ol>`;
+        }
+      }
 
 function getField(row, candidates) {
       if (!row) return "";
@@ -862,7 +910,7 @@ const stateForStats = getField(row, ["State", "state"]) || "";
 const countryForStats = getField(row, ["Country", "country"]) || "";
 const statsRow = { Soup: soupForStats, Rating: (Number.isFinite(rating) ? String(rating) : ""), City: cityForStats, State: stateForStats, Country: countryForStats };
 
-records.push({ marker, reviewer: String(reviewer).trim(), month, rating: ratingKey, dateStr: dateVal, dateObj, stats: statsRow });
+records.push({ marker, reviewer: String(reviewer).trim(), month, rating: ratingKey, ratingNum: rating, dateStr: dateVal, dateObj, stats: statsRow });
 
         bounds.push([plotLat, plotLon]);
       }
