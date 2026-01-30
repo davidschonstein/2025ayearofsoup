@@ -344,78 +344,54 @@ function median(nums) {
   return a.length % 2 ? a[mid] : (a[mid-1] + a[mid]) / 2;
 }
 
-function updateMiniStats(visible){
+function updateMiniStats(visibleRecs){
   try{
-    const statReviews = document.getElementById('statReviews');
-    const statCountries = document.getElementById('statCountries');
-    const statCities = document.getElementById('statCities');
-    const statBest3 = document.getElementById('statBest3');
-    const statWorst3 = document.getElementById('statWorst3');
+    const statReviewsEl = document.getElementById('statReviews');
+    const statCountriesEl = document.getElementById('statCountries');
+    const statCitiesEl = document.getElementById('statCities');
+    const bestList = document.getElementById('statBest3');
+    const worstList = document.getElementById('statWorst3');
+    if(!statReviewsEl || !statCountriesEl || !statCitiesEl || !bestList || !worstList) return;
 
-    if(!statReviews || !statCountries || !statCities || !statBest3 || !statWorst3) return;
+    const visible = Array.isArray(visibleRecs) ? visibleRecs : [];
+    statReviewsEl.textContent = String(visible.length);
 
-    const vis = Array.isArray(visible) ? visible : [];
-    statReviews.textContent = String(vis.length);
-
+    // Unique Countries / Cities (based on the precomputed stats snapshot on each record)
     const countries = new Set();
     const cities = new Set();
-    vis.forEach(r=>{
-      let ctry = String(getField(r, ['Country','country'])).trim();
-      let city = String(getField(r, ['City','city'])).trim();
-      const loc = String(getField(r, ['Location','location'])).trim();
-      if (!city && loc) {
-        const parts = loc.split(',').map(s=>s.trim()).filter(Boolean);
-        city = (parts[0] || '').trim();
-      }
-      if (!ctry && loc) {
-        const parts = loc.split(',').map(s=>s.trim()).filter(Boolean);
-        if (parts.length >= 3) ctry = (parts[parts.length-1] || '').trim();
-      }
-      const lcCity = city.toLowerCase();
-      const lcCtry = ctry.toLowerCase();
-      if (ctry && lcCtry !== 'unknown') countries.add(ctry);
-      if (city && lcCity !== 'unknown' && !/\b(ocean|sea)\b/i.test(city)) cities.add(city);
+    visible.forEach(rec => {
+      const s = rec && rec.stats ? rec.stats : null;
+      if(!s) return;
+      const ctry = (s.Country ?? '').toString().trim();
+      const city = (s.City ?? '').toString().trim();
+      if(ctry && ctry.toLowerCase() !== 'unknown') countries.add(ctry);
+      if(city && city.toLowerCase() !== 'unknown') cities.add(city);
     });
-    statCountries.textContent = String(countries.size);
-    statCities.textContent = String(cities.size);
+    statCountriesEl.textContent = String(countries.size);
+    statCitiesEl.textContent = String(cities.size);
 
-    const rated = vis
-      .map(r=>{
-        const num = parseFloat(String(getField(r, ['Rating','rating'])).trim());
-        return { row:r, rating: (Number.isFinite(num) ? num : null) };
-      })
-      .filter(x=>x.rating !== null);
+    // Best/Worst 3 (rated only) – include Reviewer + Soup + Rating
+    const rated = visible.filter(rec => Number.isFinite(rec.rating));
+    rated.sort((a,b) => a.rating - b.rating); // ascending
+    const worst3 = rated.slice(0,3);
+    const best3 = rated.slice(-3).reverse();
 
-    const byDesc = rated.slice().sort((a,b)=>b.rating-a.rating);
-    const byAsc  = rated.slice().sort((a,b)=>a.rating-b.rating);
-
-    const fmtItem = (x)=>{
-      const r = x.row;
-      const soup = ((r.Soup || r['Soup Name'] || '').toString().trim()) || 'Unknown soup';
-      const locParts = [];
-      const city = String(getField(r, ['City','city'])).trim();
-      const state = (r.State || '').toString().trim();
-      const country = String(getField(r, ['Country','country'])).trim();
-
-      if(city && city.toLowerCase()!=='unknown') locParts.push(city);
-      if(state && state.toLowerCase()!=='unknown') locParts.push(state);
-      else if(country && country.toLowerCase()!=='unknown' && locParts.length===0) locParts.push(country);
-
-      const loc = locParts.length ? ` <span class="stats-mini-muted">— ${escapeHTML(locParts.join(', '))}</span>` : '';
-      return `<span>${escapeHTML(soup)} (${x.rating.toFixed(1)})</span>${loc}`;
+    const fmtItem = (rec, i) => {
+      const s = (rec && rec.stats) ? rec.stats : {};
+      const reviewer = (rec && rec.reviewer ? rec.reviewer : (s.Reviewer || 'Unknown')).toString().trim() || 'Unknown';
+      const soup = (s.Soup || s['Soup Name'] || s['Soup name'] || '').toString().trim() || 'Unknown soup';
+      const ratingStr = Number.isFinite(rec.rating) ? rec.rating.toFixed(1) : '—';
+      return `<li>${i+1}. ${escapeHtml(reviewer)} — ${escapeHtml(soup)} <span class="statScore">(${escapeHtml(ratingStr)})</span></li>`;
     };
 
-    const best = byDesc.slice(0,3);
-    const worst = byAsc.slice(0,3);
-
-    statBest3.innerHTML = best.length ? best.map(x=>`<li>${fmtItem(x)}</li>`).join('') : '<li>—</li>';
-    statWorst3.innerHTML = worst.length ? worst.map(x=>`<li>${fmtItem(x)}</li>`).join('') : '<li>—</li>';
-  }catch(err){
-    console.warn('Mini stats update failed', err);
+    bestList.innerHTML = best3.length ? best3.map(fmtItem).join('') : '<li>—</li>';
+    worstList.innerHTML = worst3.length ? worst3.map(fmtItem).join('') : '<li>—</li>';
+  }catch(e){
+    console.warn('Mini stats error:', e);
   }
 }
 
-    function getField(row, candidates) {
+function getField(row, candidates) {
       if (!row) return "";
       // 1) Exact-key match first
       for (const k of candidates) {
