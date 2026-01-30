@@ -160,6 +160,42 @@
   }
   .photo-modal-body { height: calc(100vh - 140px); }
 }
+
+
+/* --- Mini stats (compact + mobile-friendly) --- */
+.stats-mini{ margin:10px 0 14px; padding:10px; border:1px solid rgba(0,0,0,.06); border-radius:14px; background:#fff; box-shadow:0 8px 22px rgba(0,0,0,.08);}
+.stats-mini-top{ display:flex; gap:10px; flex-wrap:wrap; }
+.stat-pill{ flex:1; min-width:92px; border:1px solid rgba(0,0,0,.06); border-radius:14px; padding:10px; background:rgba(0,0,0,.015); }
+.stat-label{ font-size:12px; color:#666; line-height:1.1; }
+.stat-value{ font-size:20px; font-weight:800; margin-top:4px; }
+.stats-mini-lists{ display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top:10px; }
+.stats-mini-title{ font-size:12px; font-weight:800; color:#444; margin-bottom:6px; }
+.stats-mini-ol{ margin:0; padding-left:18px; font-size:12.5px; color:#222; }
+.stats-mini-ol li{ margin:2px 0; }
+.stats-mini-muted{ color:#666; font-weight:600; }
+@media (max-width: 520px){
+  .stats-mini{ padding:10px; }
+  .stats-mini-lists{ grid-template-columns: 1fr; }
+  .stat-pill{ min-width:88px; padding:9px; }
+  .stat-value{ font-size:18px; }
+}
+
+/* --- Popup photo preview --- */
+.photo-block{ margin-top:6px; display:flex; flex-direction:column; gap:8px; }
+.photo-links{ display:flex; gap:10px; align-items:center; }
+.photo-preview-btn{
+  appearance:none; border:1px solid rgba(0,0,0,.15); background:#fff; border-radius:10px;
+  padding:6px 10px; font-weight:700; font-size:12px; cursor:pointer;
+}
+.photo-preview-btn:active{ transform: translateY(1px); }
+.photo-thumb{
+  width:100%; max-width:240px; border-radius:12px; border:1px solid rgba(0,0,0,.08);
+  box-shadow:0 10px 26px rgba(0,0,0,.10); cursor:pointer;
+}
+@media (max-width: 520px){
+  .photo-thumb{ max-width: 220px; }
+  .photo-preview-btn{ padding:7px 10px; }
+}
 </style>
 </head>
 <body>
@@ -281,6 +317,20 @@ window.addEventListener("DOMContentLoaded", () => {
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") closePhotoModal(); });
 });
 
+
+
+// Delegate clicks for popup photo previews (works on mobile + desktop)
+document.addEventListener('click', (e)=>{
+  const target = e.target.closest('.photo-preview-btn, .photo-thumb');
+  if(!target) return;
+  const url = target.getAttribute('data-photo');
+  if(url && isValidHttpUrl(url)){
+    e.preventDefault();
+    e.stopPropagation();
+    openPhotoModal(url);
+  }
+}, { passive: false });
+
 function median(nums) {
   const a = nums.slice().sort((x,y)=>x-y);
   if (!a.length) return null;
@@ -288,41 +338,63 @@ function median(nums) {
   return a.length % 2 ? a[mid] : (a[mid-1] + a[mid]) / 2;
 }
 
-function updateStats(visibleRecords, allRecords) {
-  const vis = visibleRecords || [];
-  const all = allRecords || [];
+function updateMiniStats(visible){
+  try{
+    const statReviews = document.getElementById('statReviews');
+    const statCountries = document.getElementById('statCountries');
+    const statCities = document.getElementById('statCities');
+    const statBest3 = document.getElementById('statBest3');
+    const statWorst3 = document.getElementById('statWorst3');
 
-  const ratedNums = vis.map(r => r.ratingNum).filter(v => typeof v === "number" && isFinite(v));
-  const ratedCount = ratedNums.length;
-  const avg = ratedCount ? (ratedNums.reduce((s,v)=>s+v,0)/ratedCount) : null;
-  const med = ratedCount ? median(ratedNums) : null;
+    if(!statReviews || !statCountries || !statCities || !statBest3 || !statWorst3) return;
 
-  const countriesSet = new Set();
-  const citiesSet = new Set();
-  for (const r of vis) {
-    const country = String(r.country || "").trim();
-    if (country && country.toLowerCase() !== "unknown") countriesSet.add(country);
-    const cs = String(r.cityState || "").trim();
-    if (cs && !cs.toLowerCase().includes("unknown")) citiesSet.add(cs);
-  }
+    const vis = Array.isArray(visible) ? visible : [];
+    statReviews.textContent = String(vis.length);
 
-  const setText = (id, val) => {
-    const el = document.getElementById(id);
-    if (el) el.textContent = val;
-  };
+    const countries = new Set();
+    const cities = new Set();
+    vis.forEach(r=>{
+      const ctry = (r.Country || '').toString().trim();
+      const city = (r.City || '').toString().trim();
+      if(ctry && ctry.toLowerCase() !== 'unknown') countries.add(ctry);
+      if(city && city.toLowerCase() !== 'unknown') cities.add(city);
+    });
+    statCountries.textContent = String(countries.size);
+    statCities.textContent = String(cities.size);
 
-  setText("statShown", String(vis.length));
-  setText("statTotal", String(all.length));
-  setText("statRated", String(ratedCount));
-  setText("statAvg", avg === null ? "—" : avg.toFixed(2));
-  setText("statMedian", med === null ? "—" : med.toFixed(2));
-  setText("statCountries", String(countriesSet.size));
-  setText("statCities", String(citiesSet.size));
+    const rated = vis
+      .map(r=>{
+        const num = parseFloat((r.Rating ?? '').toString().trim());
+        return { row:r, rating: (Number.isFinite(num) ? num : null) };
+      })
+      .filter(x=>x.rating !== null);
 
-  const mini = document.getElementById("statsMini");
-  if (mini) {
-    const avgTxt = avg === null ? "—" : avg.toFixed(2);
-    mini.textContent = `Shown ${vis.length}/${all.length} • Avg ${avgTxt} (n=${ratedCount}) • ${countriesSet.size} countries • ${citiesSet.size} cities`;
+    const byDesc = rated.slice().sort((a,b)=>b.rating-a.rating);
+    const byAsc  = rated.slice().sort((a,b)=>a.rating-b.rating);
+
+    const fmtItem = (x)=>{
+      const r = x.row;
+      const soup = ((r.Soup || r['Soup Name'] || '').toString().trim()) || 'Unknown soup';
+      const locParts = [];
+      const city = (r.City || '').toString().trim();
+      const state = (r.State || '').toString().trim();
+      const country = (r.Country || '').toString().trim();
+
+      if(city && city.toLowerCase()!=='unknown') locParts.push(city);
+      if(state && state.toLowerCase()!=='unknown') locParts.push(state);
+      else if(country && country.toLowerCase()!=='unknown' && locParts.length===0) locParts.push(country);
+
+      const loc = locParts.length ? ` <span class="stats-mini-muted">— ${escapeHTML(locParts.join(', '))}</span>` : '';
+      return `<span>${escapeHTML(soup)} (${x.rating.toFixed(1)})</span>${loc}`;
+    };
+
+    const best = byDesc.slice(0,3);
+    const worst = byAsc.slice(0,3);
+
+    statBest3.innerHTML = best.length ? best.map(x=>`<li>${fmtItem(x)}</li>`).join('') : '<li>—</li>';
+    statWorst3.innerHTML = worst.length ? worst.map(x=>`<li>${fmtItem(x)}</li>`).join('') : '<li>—</li>';
+  }catch(err){
+    console.warn('Mini stats update failed', err);
   }
 }
 
@@ -505,10 +577,20 @@ function parseMonth(dateStr) {
       if (notes) parts.push(`<b>Notes:</b> <span style="white-space:pre-wrap;">${escapeHTML(notes)}</span>`);
 
       if (isValidHttpUrl(photoUrl)) {
-        parts.push(`<a href="${escapeHTML(photoUrl)}" target="_blank" rel="noopener">Photo</a>`);
-      } else {
-        parts.push(`<b>Photo:</b> None`);
-      }
+  const norm = normalizePhotoUrl(photoUrl);
+  const safePhoto = escapeHTML(photoUrl);
+  const safeEmbed = escapeHTML(norm.embedUrl || photoUrl);
+  parts.push(`<b>Photo:</b>
+    <div class="photo-block">
+      <div class="photo-links">
+        <a href="${safePhoto}" target="_blank" rel="noopener">Open</a>
+        <button type="button" class="photo-preview-btn" data-photo="${safePhoto}">Preview</button>
+      </div>
+      <img class="photo-thumb" src="${safeEmbed}" alt="Soup photo" loading="lazy" data-photo="${safePhoto}" onerror="this.style.display='none'">
+    </div>`);
+} else {
+  parts.push(`<b>Photo:</b> None`);
+}
 
       const content = parts.join("<br>");
 
@@ -566,15 +648,33 @@ function parseMonth(dateStr) {
 
               <div style="height:8px;"></div>
 
-            <div class="stats-grid" aria-label="Stats">
-              <div class="stat"><div class="stat-label">Shown</div><div class="stat-value" id="statShown">0</div></div>
-              <div class="stat"><div class="stat-label">Total</div><div class="stat-value" id="statTotal">0</div></div>
-              <div class="stat"><div class="stat-label">Rated</div><div class="stat-value" id="statRated">0</div></div>
-              <div class="stat"><div class="stat-label">Avg</div><div class="stat-value" id="statAvg">—</div></div>
-              <div class="stat"><div class="stat-label">Median</div><div class="stat-value" id="statMedian">—</div></div>
-              <div class="stat"><div class="stat-label">Countries</div><div class="stat-value" id="statCountries">—</div></div>
-              <div class="stat"><div class="stat-label">Cities</div><div class="stat-value" id="statCities">—</div></div>
-            </div>
+            <div class="stats-mini" aria-label="Stats">
+  <div class="stats-mini-top">
+    <div class="stat-pill">
+      <div class="stat-label">Reviews</div>
+      <div class="stat-value" id="statReviews">0</div>
+    </div>
+    <div class="stat-pill">
+      <div class="stat-label">Countries</div>
+      <div class="stat-value" id="statCountries">0</div>
+    </div>
+    <div class="stat-pill">
+      <div class="stat-label">Cities</div>
+      <div class="stat-value" id="statCities">0</div>
+    </div>
+  </div>
+
+  <div class="stats-mini-lists">
+    <div class="stats-mini-list">
+      <div class="stats-mini-title">Best 3</div>
+      <ol id="statBest3" class="stats-mini-ol"></ol>
+    </div>
+    <div class="stats-mini-list">
+      <div class="stats-mini-title">Worst 3</div>
+      <ol id="statWorst3" class="stats-mini-ol"></ol>
+    </div>
+  </div>
+</div>
 
               <div style="display:grid; grid-template-columns: 1fr; gap:8px;">
                 <div>
@@ -756,7 +856,14 @@ L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
     const dateObj = parseISODate(dateVal);const month = parseMonth(dateVal);
         const ratingKey = hasRating ? String(Math.max(0, Math.min(10, Math.round(rating)))) : "Unrated";
 
-        records.push({ marker, reviewer: String(reviewer).trim(), month, rating: ratingKey, dateStr: dateVal, dateObj });
+        const soupForStats = getField(row, ["Soup", "Soup Name", "soup"]) || "";
+const cityForStats = getField(row, ["City", "city"]) || "";
+const stateForStats = getField(row, ["State", "state"]) || "";
+const countryForStats = getField(row, ["Country", "country"]) || "";
+const statsRow = { Soup: soupForStats, Rating: (Number.isFinite(rating) ? String(rating) : ""), City: cityForStats, State: stateForStats, Country: countryForStats };
+
+records.push({ marker, reviewer: String(reviewer).trim(), month, rating: ratingKey, dateStr: dateVal, dateObj, stats: statsRow });
+
         bounds.push([plotLat, plotLon]);
       }
 
@@ -935,7 +1042,8 @@ const status = document.getElementById("filterStatus");
             if (ok) { cluster.addLayer(rec.marker); shown++; }
           });
 
-          if (status) status.textContent = "Showing " + shown + " soups";
+          if (status) updateMiniStats(result.map(r=>r.stats || {}));
+  status.textContent = "Showing " + shown + " soups";
         }
 
         function clearFilters() {
